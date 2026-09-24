@@ -466,7 +466,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2309881601566209492}
-  - component: {fileID: 7210535036461462406}
+  - component: {fileID: 3581032305729853458}
   m_Layer: 0
   m_Name: mustangfbx
   m_TagString: Untagged
@@ -482,7 +482,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4769020603116727042}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.7071069, y: 0, z: 0, w: 0.7071067}
+  m_LocalRotation: {x: -0.7071068, y: 0, z: 0, w: 0.7071068}
   m_LocalPosition: {x: 1.75, y: 0.45, z: 22.64}
   m_LocalScale: {x: 100, y: 100, z: 100}
   m_ConstrainProportionsScale: 0
@@ -495,9 +495,9 @@ Transform:
   - {fileID: 1054630200661746087}
   - {fileID: 5334112005045119728}
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!64 &7210535036461462406
-MeshCollider:
+  m_LocalEulerAnglesHint: {x: -90, y: 0, z: 0}
+--- !u!65 &3581032305729853458
+BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -514,10 +514,9 @@ MeshCollider:
   m_IsTrigger: 1
   m_ProvidesContacts: 0
   m_Enabled: 1
-  serializedVersion: 5
-  m_Convex: 1
-  m_CookingOptions: 30
-  m_Mesh: {fileID: 0}
+  serializedVersion: 3
+  m_Size: {x: 0.014008315, y: 0.029790815, z: 0.010169613}
+  m_Center: {x: 0.00015013992, y: -0.0008091879, z: -0.00036889492}
 --- !u!1 &7516482842991487300
 GameObject:
   m_ObjectHideFlags: 0

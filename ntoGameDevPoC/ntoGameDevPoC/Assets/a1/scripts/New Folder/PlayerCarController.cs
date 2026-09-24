@@ -3,6 +3,8 @@ using UnityEngine.InputSystem;
 
 public class PlayerController : MonoBehaviour
 {
+    public static PlayerController Instance { get; private set; }
+
     [Header("Полосы")]
     public bool startOnRightLane = true;
     public float laneChangeSpeed = 16.0f;
@@ -11,18 +13,21 @@ public class PlayerController : MonoBehaviour
     public Key leftKey = Key.A;
     public Key rightKey = Key.D;
 
+    public bool IsDead => isDead;
+
     private float targetX;
     private float laneOffset = 2.5f;
     private bool isDead = false;
-    private Collider playerCollider;
 
     private void Awake()
     {
-        playerCollider = GetComponent<Collider>();
+        if (Instance == null) Instance = this;
+        else Destroy(gameObject);
     }
 
     private void Start()
     {
+        isDead = false;
         Time.timeScale = 1.0f;
 
         if (WorldManager.Instance != null)
@@ -47,15 +52,10 @@ public class PlayerController : MonoBehaviour
         if (isDead) return;
 
         Keyboard kb = Keyboard.current;
-        if (kb == null) return;
-
-        if (kb[leftKey].wasPressedThisFrame)
+        if (kb != null)
         {
-            targetX = -laneOffset;
-        }
-        else if (kb[rightKey].wasPressedThisFrame)
-        {
-            targetX = laneOffset;
+            if (kb[leftKey].wasPressedThisFrame) targetX = -laneOffset;
+            else if (kb[rightKey].wasPressedThisFrame) targetX = laneOffset;
         }
 
         Vector3 currentPos = transform.position;
@@ -63,39 +63,24 @@ public class PlayerController : MonoBehaviour
         transform.position = new Vector3(newX, currentPos.y, currentPos.z);
     }
 
-    private void OnTriggerEnter(Collider other)
+    // МЕТОД АВАРИИ (вызывается математическим детектором)
+    public void TriggerCrash(ObstacleMover mover)
     {
         if (isDead) return;
-
-        ObstacleMover mover = other.GetComponentInParent<ObstacleMover>();
-        if (mover != null)
-        {
-            if (playerCollider != null)
-            {
-                float carFrontZ = playerCollider.bounds.max.z;
-                float obstacleHalfZ = other.bounds.extents.z;
-
-                Vector3 fixedPos = mover.transform.position;
-                fixedPos.z = carFrontZ + obstacleHalfZ;
-                mover.transform.position = fixedPos;
-            }
-
-            mover.StopMovement();
-
-            if (WorldManager.Instance != null)
-            {
-                WorldManager.Instance.StopWorld();
-            }
-
-            Die();
-        }
-    }
-
-    private void Die()
-    {
         isDead = true;
 
-        // Открываем меню смерти
+        Debug.Log($"<color=red><b>[100% АВАРИЯ!]</b></color> Столкновение с объектом: <b>{mover.gameObject.name}</b>");
+
+        // 1. Останавливаем препятствие
+        mover.StopMovement();
+
+        // 2. Останавливаем дорогу и спавн
+        if (WorldManager.Instance != null)
+        {
+            WorldManager.Instance.StopWorld();
+        }
+
+        // 3. Открываем меню смерти
         if (GameUIManager.Instance != null)
         {
             GameUIManager.Instance.TriggerGameOver();
