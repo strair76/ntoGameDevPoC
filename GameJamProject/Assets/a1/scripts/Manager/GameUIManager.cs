@@ -2,31 +2,25 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
-using TMPro;
 
 public class GameUIManager : MonoBehaviour
 {
     public static GameUIManager Instance { get; private set; }
 
     [Header("Панель меню")]
-    [Tooltip("Главная панель меню (фон/окно, в котором лежат кнопки)")]
     public GameObject menuPanel;
 
-    [Header("Заголовки (Создайте свои объекты в UI)")]
-    [Tooltip("Ваш созданный текст для паузы (включится при нажатии Esc)")]
+    [Header("Заголовки")]
     public GameObject pauseTitleObject;
-
-    [Tooltip("Ваш созданный текст для смерти (включится при аварии)")]
     public GameObject deathTitleObject;
 
     [Header("Кнопки")]
-    public Button resumeButton;   // Кнопка "Продолжить" (скрывается при смерти)
-    public Button restartButton;  // Кнопка "Заново"
-    public Button menuButton;     // Кнопка "В главное меню"
-    public Button quitButton;     // Кнопка "Выход из игры"
+    public Button resumeButton;
+    public Button restartButton;
+    public Button menuButton;
+    public Button quitButton;
 
     [Header("Настройки сцен")]
-    [Tooltip("Точное имя вашей сцены с главным меню")]
     public string mainMenuSceneName = "MainMenu";
 
     private bool isPaused = false;
@@ -40,12 +34,10 @@ public class GameUIManager : MonoBehaviour
 
     private void Start()
     {
-        // Скрываем меню и тексты на старте
         if (menuPanel != null) menuPanel.SetActive(false);
         if (pauseTitleObject != null) pauseTitleObject.SetActive(false);
         if (deathTitleObject != null) deathTitleObject.SetActive(false);
 
-        // Привязываем клики к кнопкам
         if (resumeButton != null) resumeButton.onClick.AddListener(ResumeGame);
         if (restartButton != null) restartButton.onClick.AddListener(RestartGame);
         if (menuButton != null) menuButton.onClick.AddListener(GoToMainMenu);
@@ -57,26 +49,20 @@ public class GameUIManager : MonoBehaviour
         Keyboard kb = Keyboard.current;
         if (kb == null) return;
 
-        // Открытие / закрытие паузы на Esc
         if (kb.escapeKey.wasPressedThisFrame && !isGameOver)
         {
-            if (isPaused)
-                ResumeGame();
-            else
-                PauseGame();
+            if (isPaused) ResumeGame();
+            else PauseGame();
         }
     }
 
-    // --- ПАУЗА (ESC) ---
     public void PauseGame()
     {
         isPaused = true;
         Time.timeScale = 0f;
 
-        // Включаем ВАШ текст паузы и выключаем текст смерти
         if (pauseTitleObject != null) pauseTitleObject.SetActive(true);
         if (deathTitleObject != null) deathTitleObject.SetActive(false);
-
         if (resumeButton != null) resumeButton.gameObject.SetActive(true);
         if (menuPanel != null) menuPanel.SetActive(true);
     }
@@ -89,34 +75,43 @@ public class GameUIManager : MonoBehaviour
         if (menuPanel != null) menuPanel.SetActive(false);
     }
 
-    // --- СМЕРТЬ ИГРОКА ---
     public void TriggerGameOver()
     {
         isGameOver = true;
         Time.timeScale = 0f;
 
-        // Включаем ВАШ текст смерти и выключаем текст паузы
+        // Сохраняем монеты и рекорд
+        if (ScoreManager.Instance != null)
+        {
+            ScoreManager.Instance.SaveResults();
+        }
+
         if (pauseTitleObject != null) pauseTitleObject.SetActive(false);
         if (deathTitleObject != null) deathTitleObject.SetActive(true);
-
-        if (resumeButton != null) resumeButton.gameObject.SetActive(false); // Нельзя продолжить мертвым
+        if (resumeButton != null) resumeButton.gameObject.SetActive(false);
         if (menuPanel != null) menuPanel.SetActive(true);
     }
 
     public void RestartGame()
     {
+        if (ScoreManager.Instance != null) ScoreManager.Instance.SaveResults();
+
         Time.timeScale = 1f;
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
     public void GoToMainMenu()
     {
+        if (ScoreManager.Instance != null) ScoreManager.Instance.SaveResults();
+
         Time.timeScale = 1f;
         SceneManager.LoadScene(mainMenuSceneName);
     }
 
     public void QuitGame()
     {
+        if (ScoreManager.Instance != null) ScoreManager.Instance.SaveResults();
+
         Application.Quit();
         #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;

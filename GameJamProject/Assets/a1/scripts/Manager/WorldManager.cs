@@ -108,6 +108,19 @@ public class WorldManager : MonoBehaviour
         activeCarExtraSpeed = 0f;
         if (spawnCoroutine != null) StopCoroutine(spawnCoroutine);
     }
+    // Метод для обновления списков препятствий под выбранную локацию
+    public void SetLocationObstacles(ObstacleConfig[] newStatics, ObstacleConfig[] newCars)
+    {
+        if (newStatics != null && newStatics.Length > 0)
+        {
+            staticObstacles = newStatics;
+        }
+
+        if (newCars != null && newCars.Length > 0)
+        {
+            carObstacles = newCars;
+        }
+    }
 
     private void MoveRoad()
     {

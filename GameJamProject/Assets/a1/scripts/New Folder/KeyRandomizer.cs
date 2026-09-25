@@ -6,23 +6,37 @@ public class KeyRandomizer : MonoBehaviour
 {
     public PlayerController playerController;
 
-    [Header("Постоянный HUD (текущие клавиши)")]
-    public TextMeshProUGUI keyDisplayTMP;
+    [Header("Постоянный HUD (текущие клавиши в углу)")]
+    public TextMeshProUGUI hudKeyDisplayTMP;
 
-    [Header("Плавное предупреждение (Canvas Group)")]
-    [Tooltip("Объект WarningBanner с компонентом Canvas Group")]
+    [Header("Ваш собственный объект предупреждения (UI)")]
+    [Tooltip("Объект баннера/плашки предупреждения на Canvas")]
+    public GameObject warningBannerObject;
+
+    [Tooltip("Компонент CanvasGroup на баннере (для плавного растворения альфы)")]
     public CanvasGroup warningCanvasGroup;
 
-    [Tooltip("Текст внутри WarningBanner")]
+    [Tooltip("Текст внутри вашего баннера предупреждения")]
     public TextMeshProUGUI warningTMP;
 
-    [Tooltip("За сколько секунд до смены начать плавное появление")]
+    [Header("Настройки времени")]
+    [Tooltip("За сколько секунд до смены показывать предупреждение")]
     public float warningDuration = 3.0f;
 
-    [Tooltip("Скорость плавного появления и затухания (чем больше, тем быстрее)")]
+    [Tooltip("Сколько секунд держать сообщение 'Клавиши сменены' после смены")]
+    public float postSwitchDisplayDuration = 1.2f;
+
+    [Tooltip("Скорость плавного появления и растворения")]
     public float fadeSpeed = 3.5f;
 
-    [Header("Текущие клавиши")]
+    [Header("Кастомизация текста")]
+    [TextArea]
+    public string warningMessageTemplate = "<color=#FF3333><b>⚠️ ВНИМАНИЕ!</b></color>\nСмена клавиш через: <b>{time}</b>...";
+
+    [TextArea]
+    public string switchedMessageTemplate = "<color=#00FF88><b>КЛАВИШИ СМЕНЕНЫ!</b></color>\n[<b>{left}</b>]  |  [<b>{right}</b>]";
+
+    [Header("Текущие активные клавиши")]
     public Key currentLeftKey = Key.A;
     public Key currentRightKey = Key.D;
 
@@ -46,7 +60,7 @@ public class KeyRandomizer : MonoBehaviour
     private float timer;
     private float currentInterval = 15f;
     private DifficultyManager.DifficultyData activeData;
-    private float postSwitchDisplayTimer = 0f; // Таймер показа сообщения "Клавиши сменены"
+    private float postSwitchTimer = 0f;
 
     private void Start()
     {
@@ -69,73 +83,103 @@ public class KeyRandomizer : MonoBehaviour
 
         timer = currentInterval;
 
-        // На старте плашка полностью прозрачна
-        if (warningCanvasGroup != null)
-        {
-            warningCanvasGroup.alpha = 0f;
-        }
-
+        HideWarningImmediate();
         UpdateHUD();
     }
 
     private void Update()
     {
-        if (WorldManager.Instance != null && !WorldManager.Instance.isWorldActive) return;
-        if (Time.timeScale == 0) return;
+        // 1. ПРОВЕРКА НА ПАУЗУ ИЛИ СМЕРТЬ:
+        bool isGamePausedOrDead = (Time.timeScale == 0f) ||
+                                  (PlayerController.Instance != null && PlayerController.Instance.IsDead) ||
+                                  (WorldManager.Instance != null && !WorldManager.Instance.isWorldActive);
 
+        // Если игра остановлена (пауза по Esc или авария) — НЕМЕДЛЕННО скрываем баннер
+        if (isGamePausedOrDead)
+        {
+            HideWarningImmediate();
+            return;
+        }
+
+        // 2. ТАЙМЕРЫ И СМЕНА КЛАВИШ (тикают только когда игра активна)
         timer -= Time.deltaTime;
 
         if (timer <= 0f)
         {
             ChooseNextKeyCombination();
             timer = currentInterval;
-            postSwitchDisplayTimer = 1.0f; // Держим плашку 1 секунду после смены
+            postSwitchTimer = postSwitchDisplayDuration;
         }
 
-        // Обновляем состояние интерфейса и плавную анимацию прозрачности
-        UpdateWarningAnimation();
+        UpdateWarningDisplay();
         UpdateHUD();
     }
 
-    // Плавная анимация появления и исчезновения
-    private void UpdateWarningAnimation()
+    // Мгновенное скрытие баннера (вызывается на паузе и при смерти)
+    public void HideWarningImmediate()
     {
-        if (warningCanvasGroup == null) return;
+        if (warningCanvasGroup != null)
+        {
+            warningCanvasGroup.alpha = 0f;
+        }
 
+        if (warningBannerObject != null)
+        {
+            warningBannerObject.SetActive(false);
+        }
+    }
+
+    private void UpdateWarningDisplay()
+    {
         float targetAlpha = 0f;
+        bool shouldBeVisible = false;
 
-        // 1. ФАЗА ПРЕДУПРЕЖДЕНИЯ (за 3 секунды до смены)
+        // 1. Фаза предупреждения (обратный отсчет)
         if (timer <= warningDuration)
         {
-            targetAlpha = 1f; // Плавно проявляем
+            shouldBeVisible = true;
+            targetAlpha = 1f;
 
             if (warningTMP != null)
             {
                 int secondsLeft = Mathf.CeilToInt(timer);
-                warningTMP.text = $"<color=#FF3333>⚠️ ВНИМАНИЕ!</color>\nСмена клавиш через: <b>{secondsLeft}</b>...";
+                warningTMP.text = warningMessageTemplate.Replace("{time}", secondsLeft.ToString());
             }
         }
-        // 2. ФАЗА СРАЗУ ПОСЛЕ СМЕНЫ (показываем новые клавиши)
-        else if (postSwitchDisplayTimer > 0f)
+        // 2. Фаза подтверждения смены
+        else if (postSwitchTimer > 0f)
         {
-            postSwitchDisplayTimer -= Time.deltaTime;
+            postSwitchTimer -= Time.deltaTime;
+            shouldBeVisible = true;
             targetAlpha = 1f;
 
             if (warningTMP != null)
             {
                 string leftName = FormatKeyName(currentLeftKey);
                 string rightName = FormatKeyName(currentRightKey);
-                warningTMP.text = $"<color=#00FF88>КЛАВИШИ СМЕНЕНЫ!</color>\n[<b>{leftName}</b>] | [<b>{rightName}</b>]";
+                warningTMP.text = switchedMessageTemplate.Replace("{left}", leftName).Replace("{right}", rightName);
             }
         }
-        // 3. ФАЗА СПОКОЙНОЙ ЕЗДЫ (плавно растворяем)
+        // 3. Фаза покоя
         else
         {
             targetAlpha = 0f;
         }
 
-        // Плавная интерполяция прозрачности к целевому значению
-        warningCanvasGroup.alpha = Mathf.MoveTowards(warningCanvasGroup.alpha, targetAlpha, fadeSpeed * Time.deltaTime);
+        // Плавное растворение или обычное включение
+        if (warningCanvasGroup != null)
+        {
+            warningCanvasGroup.alpha = Mathf.MoveTowards(warningCanvasGroup.alpha, targetAlpha, fadeSpeed * Time.deltaTime);
+
+            if (warningBannerObject != null)
+            {
+                warningBannerObject.SetActive(warningCanvasGroup.alpha > 0.01f);
+            }
+        }
+        else if (warningBannerObject != null)
+        {
+            warningBannerObject.SetActive(shouldBeVisible);
+        }
     }
 
     public void ChooseNextKeyCombination()
@@ -183,12 +227,11 @@ public class KeyRandomizer : MonoBehaviour
 
     private void UpdateHUD()
     {
-        if (keyDisplayTMP != null)
+        if (hudKeyDisplayTMP != null)
         {
             string leftFormatted = FormatKeyName(currentLeftKey);
             string rightFormatted = FormatKeyName(currentRightKey);
-
-            keyDisplayTMP.text = $"Влево: [<b><color=#00FFCC>{leftFormatted}</color></b>] | Вправо: [<b><color=#FFCC00>{rightFormatted}</color></b>]";
+            hudKeyDisplayTMP.text = $"Влево: [<b><color=#00FFCC>{leftFormatted}</color></b>] | Вправо: [<b><color=#FFCC00>{rightFormatted}</color></b>]";
         }
     }
 
@@ -203,7 +246,7 @@ public class KeyRandomizer : MonoBehaviour
             case Key.LeftAlt: return "L-ALT";
             case Key.RightAlt: return "R-ALT";
             case Key.CapsLock: return "CAPS";
-            case Key.Backspace: return "BACKSPACE";
+            case Key.Backspace: return "BACK";
             case Key.Enter: return "ENTER";
             case Key.Tab: return "TAB";
             case Key.Digit1: return "1";

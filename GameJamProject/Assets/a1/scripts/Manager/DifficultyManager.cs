@@ -31,21 +31,23 @@ public class DifficultyManager : MonoBehaviour
     public class DifficultyData
     {
         [Header("Скорость дороги")]
-        public float startRoadSpeed = 18f;
-        public float maxRoadSpeed = 40f;
-        public float speedIncreasePerSec = 0.2f;
+        public float startRoadSpeed = 20f;
+        public float maxRoadSpeed = 45f;
+        public float speedIncreasePerSec = 0.25f;
 
         [Header("Встречные машины")]
-        public float startCarExtraSpeed = 8f;
-        public float maxCarExtraSpeed = 22f;
+        public float startCarExtraSpeed = 10f;
+        public float maxCarExtraSpeed = 25f;
         public float carSpeedIncreasePerSec = 0.2f;
 
         [Header("Окно реакции на спавн")]
-        public float startSafeGap = 1.8f;
-        public float minSafeGap = 1.2f;
+        public float startSafeGap = 1.6f;
+        public float minSafeGap = 1.0f;
 
         [Header("Смена клавиш")]
+        [Tooltip("Интервал смены клавиш в секундах для этой сложности")]
         public float keyChangeInterval = 15.0f;
+
         public bool allowRandomPoolKeys = true;
         [Range(0, 100)] public int randomPoolWeight = 15;
 
@@ -55,89 +57,44 @@ public class DifficultyManager : MonoBehaviour
     [Header("Текущая сложность")]
     public DifficultyLevel currentDifficulty = DifficultyLevel.Normal;
 
-    [Header("Пресеты сложности")]
-    public DifficultyData easyPreset = new DifficultyData();
-    public DifficultyData normalPreset = new DifficultyData();
-    public DifficultyData hardPreset = new DifficultyData();
+    [Header("Пресеты сложности (НАСТРАИВАЮТСЯ ЗДЕСЬ)")]
+    public DifficultyData easyPreset = new DifficultyData 
+    { 
+        startRoadSpeed = 16f, maxRoadSpeed = 35f, speedIncreasePerSec = 0.15f,
+        startCarExtraSpeed = 6f, maxCarExtraSpeed = 15f, carSpeedIncreasePerSec = 0.1f,
+        startSafeGap = 1.9f, minSafeGap = 1.3f, keyChangeInterval = 25.0f, allowRandomPoolKeys = false 
+    };
+
+    public DifficultyData normalPreset = new DifficultyData 
+    { 
+        startRoadSpeed = 24f, maxRoadSpeed = 52f, speedIncreasePerSec = 0.3f,
+        startCarExtraSpeed = 12f, maxCarExtraSpeed = 25f, carSpeedIncreasePerSec = 0.25f,
+        startSafeGap = 1.5f, minSafeGap = 0.85f, keyChangeInterval = 15.0f, allowRandomPoolKeys = true, randomPoolWeight = 20 
+    };
+
+    public DifficultyData hardPreset = new DifficultyData 
+    { 
+        startRoadSpeed = 38f, maxRoadSpeed = 80f, speedIncreasePerSec = 0.55f,
+        startCarExtraSpeed = 18f, maxCarExtraSpeed = 35f, carSpeedIncreasePerSec = 0.4f,
+        startSafeGap = 1.0f, minSafeGap = 0.55f, keyChangeInterval = 7.0f, allowRandomPoolKeys = true, randomPoolWeight = 40 
+    };
 
     private void Awake()
     {
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
 
-        // 1. ЗАГРУЖАЕМ ВСЕГДА (без всяких галочек и условий)
+        // Загружаем сохраненную сложность из Меню
         if (PlayerPrefs.HasKey("SelectedDifficulty"))
         {
-            int savedIndex = PlayerPrefs.GetInt("SelectedDifficulty");
-            currentDifficulty = (DifficultyLevel)savedIndex;
+            currentDifficulty = (DifficultyLevel)PlayerPrefs.GetInt("SelectedDifficulty");
         }
 
-        // 2. Гарантированно выставляем контрастные значения для проверки
-        SetupPresets();
-
-        // 3. Выводим в консоль подтверждение, что сложность ПРИМЕНЕНА
+        // Выводим в консоль ТОЧНЫЕ цифры из вашего Инспектора
         DifficultyData active = GetActiveSettings();
-        Debug.Log($"<color=yellow>[ИГРА]</color> Применена сложность: <b>{currentDifficulty}</b> | Скорость дороги: <b>{active.startRoadSpeed}</b> | Смена клавиш: <b>{active.keyChangeInterval}с</b>");
-    }
-
-    private void SetupPresets()
-    {
-        // ЛЕГКИЙ
-        easyPreset.startRoadSpeed = 16f;
-        easyPreset.maxRoadSpeed = 35f;
-        easyPreset.speedIncreasePerSec = 0.15f;
-        easyPreset.startCarExtraSpeed = 6f;
-        easyPreset.maxCarExtraSpeed = 15f;
-        easyPreset.carSpeedIncreasePerSec = 0.1f;
-        easyPreset.startSafeGap = 1.9f;
-        easyPreset.minSafeGap = 1.3f;
-        easyPreset.keyChangeInterval = 25.0f; // Каждые 25 секунд
-        easyPreset.allowRandomPoolKeys = false;
-
-        if (easyPreset.presetCombinations.Count == 0)
-        {
-            easyPreset.presetCombinations.Add(new KeyCombination("База A/D", Key.A, Key.D, 50));
-            easyPreset.presetCombinations.Add(new KeyCombination("W / S", Key.W, Key.S, 25));
-        }
-
-        // СРЕДНИЙ
-        normalPreset.startRoadSpeed = 24f;
-        normalPreset.maxRoadSpeed = 52f;
-        normalPreset.speedIncreasePerSec = 0.3f;
-        normalPreset.startCarExtraSpeed = 12f;
-        normalPreset.maxCarExtraSpeed = 25f;
-        normalPreset.carSpeedIncreasePerSec = 0.25f;
-        normalPreset.startSafeGap = 1.5f;
-        normalPreset.minSafeGap = 0.85f;
-        normalPreset.keyChangeInterval = 15.0f; // Каждые 15 секунд
-        normalPreset.allowRandomPoolKeys = true;
-        normalPreset.randomPoolWeight = 20;
-
-        if (normalPreset.presetCombinations.Count == 0)
-        {
-            normalPreset.presetCombinations.Add(new KeyCombination("База A/D", Key.A, Key.D, 40));
-            normalPreset.presetCombinations.Add(new KeyCombination("L-Shift / Enter", Key.LeftShift, Key.Enter, 15));
-        }
-
-        // ХАРДКОР (ОЧЕНЬ БЫСТРО)
-        hardPreset.startRoadSpeed = 38f; // Машина полетит сразу на бешеной скорости
-        hardPreset.maxRoadSpeed = 80f;
-        hardPreset.speedIncreasePerSec = 0.6f;
-        hardPreset.startCarExtraSpeed = 20f;
-        hardPreset.maxCarExtraSpeed = 40f;
-        hardPreset.carSpeedIncreasePerSec = 0.45f;
-        hardPreset.startSafeGap = 1.0f;
-        hardPreset.minSafeGap = 0.55f;
-        hardPreset.keyChangeInterval = 7.0f; // Смена каждые 7 секунд!
-        hardPreset.allowRandomPoolKeys = true;
-        hardPreset.randomPoolWeight = 40;
-
-        if (hardPreset.presetCombinations.Count == 0)
-        {
-            hardPreset.presetCombinations.Add(new KeyCombination("A / D", Key.A, Key.D, 10));
-            hardPreset.presetCombinations.Add(new KeyCombination("F1 / F11", Key.F1, Key.F11, 25));
-            hardPreset.presetCombinations.Add(new KeyCombination("L-Ctrl / R-Alt", Key.LeftCtrl, Key.RightAlt, 25));
-        }
+        Debug.Log($"<color=cyan>[ПРЕСЕТ АКТИВИРОВАН]</color> Режим: <b>{currentDifficulty}</b> | " +
+                  $"Стартовая скорость дороги: <b>{active.startRoadSpeed}</b> | " +
+                  $"Интервал смены клавиш: <b>{active.keyChangeInterval}с</b>");
     }
 
     public DifficultyData GetActiveSettings()
@@ -146,8 +103,7 @@ public class DifficultyManager : MonoBehaviour
         {
             case DifficultyLevel.Easy: return easyPreset;
             case DifficultyLevel.Hard: return hardPreset;
-            default: return normalPreset; 
-            
+            default: return normalPreset;
         }
     }
 }
