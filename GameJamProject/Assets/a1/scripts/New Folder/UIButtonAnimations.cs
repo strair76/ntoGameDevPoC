@@ -6,30 +6,20 @@ using UnityEngine.EventSystems;
 public class UIButtonAnimator : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerEnterHandler, IPointerExitHandler
 {
     [Header("Настройки сжатия (Scale)")]
-    [Tooltip("Масштаб при нажатии (0.9 = сжатие на 10%)")]
     public float pressedScale = 0.9f;
-
-    [Tooltip("Масштаб при наведении мыши (для ПК)")]
     public float hoverScale = 1.05f;
-
-    [Tooltip("Скорость перехода анимации")]
     public float animationSpeed = 15f;
 
-    [Header("Настройки для Toggle (Переключателей)")]
-    [Tooltip("Масштаб кнопки, когда Toggle ВКЛЮЧЕН (выбран)")]
+    [Header("Настройки для Toggle")]
     public float toggleOnScale = 1.08f;
-
-    [Tooltip("Включить плавную смену цвета при выборе?")]
     public bool animateColor = true;
-
-    [Tooltip("Картинка, цвет которой будет меняться (если не указана, возьмет Image с этого объекта)")]
     public Graphic targetGraphic;
-
     public Color normalColor = Color.white;
-    public Color toggleActiveColor = new Color(0.2f, 1f, 0.6f); // Сочный неоново-зеленый
+    public Color toggleActiveColor = new Color(0.2f, 1f, 0.6f);
 
     private Vector3 originalScale;
     private Toggle toggle;
+    private Selectable selectable; // Button или Toggle
     private bool isPointerDown = false;
     private bool isPointerInside = false;
 
@@ -40,6 +30,7 @@ public class UIButtonAnimator : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     {
         originalScale = transform.localScale;
         toggle = GetComponent<Toggle>();
+        selectable = GetComponent<Selectable>();
 
         if (targetGraphic == null)
             targetGraphic = GetComponent<Graphic>();
@@ -50,7 +41,6 @@ public class UIButtonAnimator : MonoBehaviour, IPointerDownHandler, IPointerUpHa
 
     private void Start()
     {
-        // Если на объекте есть Toggle — подписываемся на смену состояния
         if (toggle != null)
         {
             toggle.onValueChanged.AddListener(OnToggleValueChanged);
@@ -60,7 +50,6 @@ public class UIButtonAnimator : MonoBehaviour, IPointerDownHandler, IPointerUpHa
 
     private void OnEnable()
     {
-        // Сброс при повторном открытии меню
         isPointerDown = false;
         isPointerInside = false;
 
@@ -70,22 +59,29 @@ public class UIButtonAnimator : MonoBehaviour, IPointerDownHandler, IPointerUpHa
             transform.localScale = originalScale;
     }
 
-    // --- ОБРАБОТКА НАЖАТИЙ МЫШИ / ПАЛЬЦА ---
+    // Проверка: можно ли сейчас нажимать на кнопку
+    private bool IsInteractable()
+    {
+        return selectable == null || selectable.interactable;
+    }
 
     public void OnPointerDown(PointerEventData eventData)
     {
+        if (!IsInteractable()) return; // Если заблокирована — игнорируем нажатие!
         isPointerDown = true;
         StopAndStartScale(GetTargetScale());
     }
 
     public void OnPointerUp(PointerEventData eventData)
     {
+        if (!IsInteractable()) return;
         isPointerDown = false;
         StopAndStartScale(GetTargetScale());
     }
 
     public void OnPointerEnter(PointerEventData eventData)
     {
+        if (!IsInteractable()) return;
         isPointerInside = true;
         if (!isPointerDown)
             StopAndStartScale(GetTargetScale());
@@ -98,11 +94,8 @@ public class UIButtonAnimator : MonoBehaviour, IPointerDownHandler, IPointerUpHa
         StopAndStartScale(GetTargetScale());
     }
 
-    // --- ЛОГИКА ДЛЯ TOGGLE ---
-
     private void OnToggleValueChanged(bool isOn)
     {
-        // Небольшой сочный "хлопок" (Punch) при переключении
         StopAndStartScale(GetTargetScale(), punch: true);
 
         if (animateColor && targetGraphic != null)
@@ -123,46 +116,27 @@ public class UIButtonAnimator : MonoBehaviour, IPointerDownHandler, IPointerUpHa
         }
     }
 
-    // Определение целевого размера кнопки прямо сейчас
     private Vector3 GetTargetScale()
     {
-        // 1. Палец зажат -> кнопка сжата
-        if (isPointerDown)
-        {
-            return originalScale * pressedScale;
-        }
+        if (!IsInteractable()) return originalScale;
 
-        // 2. Это Toggle и он ВКЛЮЧЕН -> кнопка чуть увеличена
-        if (toggle != null && toggle.isOn)
-        {
-            return originalScale * toggleOnScale;
-        }
+        if (isPointerDown) return originalScale * pressedScale;
+        if (toggle != null && toggle.isOn) return originalScale * toggleOnScale;
+        if (isPointerInside) return originalScale * hoverScale;
 
-        // 3. Мышь наведена -> легкое увеличение
-        if (isPointerInside)
-        {
-            return originalScale * hoverScale;
-        }
-
-        // 4. Покой -> стандартный размер
         return originalScale;
     }
-
-    // --- ПЛАВНЫЕ КОРОУТИНЫ (РАБОТАЮТ НА ПАУЗЕ) ---
 
     private void StopAndStartScale(Vector3 target, bool punch = false)
     {
         if (!gameObject.activeInHierarchy) return;
 
-        if (scaleCoroutine != null)
-            StopCoroutine(scaleCoroutine);
-
+        if (scaleCoroutine != null) StopCoroutine(scaleCoroutine);
         scaleCoroutine = StartCoroutine(AnimateScaleRoutine(target, punch));
     }
 
     private IEnumerator AnimateScaleRoutine(Vector3 target, bool punch)
     {
-        // Если это переключение Toggle — сначала делаем короткий упругий отскок
         if (punch)
         {
             Vector3 punchScale = target * 1.12f;
@@ -176,10 +150,8 @@ public class UIButtonAnimator : MonoBehaviour, IPointerDownHandler, IPointerUpHa
             }
         }
 
-        // Плавная доводка до итогового размера
         while (Vector3.Distance(transform.localScale, target) > 0.002f)
         {
-            // Time.unscaledDeltaTime позволяет анимации работать даже при Time.timeScale = 0 (на паузе)
             transform.localScale = Vector3.Lerp(transform.localScale, target, Time.unscaledDeltaTime * animationSpeed);
             yield return null;
         }

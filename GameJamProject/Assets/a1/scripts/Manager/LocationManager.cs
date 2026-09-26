@@ -7,46 +7,44 @@ public class LocationManager : MonoBehaviour
     [System.Serializable]
     public class LocationData
     {
-        public string locationName = "Название локации";
+        public string locationName = "Локация";
 
         [Header("1. Визуал и окружение")]
-        [Tooltip("Родительский объект с фоновыми декорациями (включится только для этой локации)")]
-        public GameObject environmentRoot;
+        [Tooltip("Префаб локации из папки Project (или готовый объект со сцены)")]
+        public GameObject environmentPrefabOrObject;
 
-        [Tooltip("Материал для полотна дороги (асфальт, песок, снег)")]
+        [Tooltip("Материал дороги для этой темы")]
         public Material roadMaterial;
 
-        [Tooltip("Материал неба (Skybox)")]
+        [Tooltip("Скайбокс (небо) для этой темы")]
         public Material skyboxMaterial;
 
         [Header("2. Препятствия под эту локацию")]
-        [Tooltip("Статичные объекты именно для этой темы (например: бочки для города, кактусы для пустыни)")]
         public WorldManager.ObstacleConfig[] staticObstacles;
-
-        [Tooltip("Встречные машины именно для этой темы (например: такси для города, багги для пустыни)")]
         public WorldManager.ObstacleConfig[] carObstacles;
 
-        [Header("3. Машина игрока (Опционально)")]
-        [Tooltip("Если хотите, чтобы у игрока менялась моделька под тему (например: спорткар в городе, джип в пустыне)")]
+        [Header("3. Машина игрока под тему (Опционально)")]
         public GameObject playerCarModel;
     }
 
-    [Header("Список всех ваших локаций")]
-    [Tooltip("0 = Первая локация, 1 = Вторая, 2 = Третья")]
+    [Header("Список ваших локаций")]
     public LocationData[] locations;
 
-    [Header("Ссылки на дорогу")]
-    [Tooltip("Рендереры кусков дороги (чтобы скрипт сменил им материал)")]
+    [Header("Ссылки на куски дороги на сцене")]
     public Renderer[] roadRenderers;
+
+    private GameObject currentSpawnedEnvironment; // Экземпляр заспавненного префаба на сцене
 
     private void Awake()
     {
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
+    }
 
-        // Считываем номер сохраненной локации из Главного Меню
+    private void Start()
+    {
+        // Запускаем именно в Start(), чтобы WorldManager.Instance гарантированно уже существовал!
         int selectedIndex = PlayerPrefs.GetInt("SelectedLocation", 0);
-
         ApplyLocation(selectedIndex);
     }
 
@@ -54,54 +52,69 @@ public class LocationManager : MonoBehaviour
     {
         if (locations == null || locations.Length == 0) return;
 
-        // Защита от выхода за границы списка
         if (index < 0 || index >= locations.Length) index = 0;
+
+        LocationData activeLoc = locations[index];
+
+        // 1. УПРАВЛЕНИЕ ОКРУЖЕНИЕМ (ПРЕФАБ ИЛИ ОБЪЕКТ СО СЦЕНЫ)
+        // Удаляем ранее заспавненный префаб предыдущей темы (если был)
+        if (currentSpawnedEnvironment != null)
+        {
+            Destroy(currentSpawnedEnvironment);
+        }
 
         for (int i = 0; i < locations.Length; i++)
         {
             bool isCurrent = (i == index);
+            GameObject env = locations[i].environmentPrefabOrObject;
 
-            // 1. Включаем декорации выбранной локации и выключаем чужие
-            if (locations[i].environmentRoot != null)
+            if (env != null)
             {
-                locations[i].environmentRoot.SetActive(isCurrent);
+                // Проверяем: это объект уже на сцене или это префаб из папки Project?
+                if (env.scene.rootCount != 0) 
+                {
+                    // Объект лежит на сцене: просто включаем/выключаем
+                    env.SetActive(isCurrent);
+                }
+                else if (isCurrent)
+                {
+                    // Это префаб из папки: спавним его на сцену в координаты (0, 0, 0)!
+                    currentSpawnedEnvironment = Instantiate(env, Vector3.zero, Quaternion.identity);
+                }
             }
 
-            // 2. Включаем модельку машины игрока под эту тему (если назначена)
+            // Машинка игрока под тему (если есть)
             if (locations[i].playerCarModel != null)
             {
                 locations[i].playerCarModel.SetActive(isCurrent);
             }
+        }
 
-            // Настройки активной локации
-            if (isCurrent)
+        // 2. МАТЕРИАЛ ДОРОГИ
+        if (activeLoc.roadMaterial != null && roadRenderers != null)
+        {
+            foreach (var rend in roadRenderers)
             {
-                // Смена материала дороги
-                if (locations[i].roadMaterial != null && roadRenderers != null)
-                {
-                    foreach (var rend in roadRenderers)
-                    {
-                        if (rend != null) rend.material = locations[i].roadMaterial;
-                    }
-                }
-
-                // Смена неба
-                if (locations[i].skyboxMaterial != null)
-                {
-                    RenderSettings.skybox = locations[i].skyboxMaterial;
-                }
-
-                // 3. ПЕРЕДАЕМ НОВЫЕ ПРЕПЯТСТВИЯ И МАШИНЫ В СПАВНЕР
-                if (WorldManager.Instance != null)
-                {
-                    WorldManager.Instance.SetLocationObstacles(
-                        locations[i].staticObstacles,
-                        locations[i].carObstacles
-                    );
-                }
-
-                Debug.Log($"<color=cyan>[LOCATION]</color> Активирована локация: <b>{locations[i].locationName}</b>");
+                if (rend != null) rend.material = activeLoc.roadMaterial;
             }
         }
+
+        // 3. НЕБО (SKYBOX)
+        if (activeLoc.skyboxMaterial != null)
+        {
+            RenderSettings.skybox = activeLoc.skyboxMaterial;
+        }
+
+        // 4. ПЕРЕДАЕМ ПРЕПЯТСТВИЯ И МАШИНЫ В WORLD MANAGER
+        if (WorldManager.Instance != null)
+        {
+            WorldManager.Instance.SetLocationObstacles(activeLoc.staticObstacles, activeLoc.carObstacles);
+        }
+        else
+        {
+            Debug.LogWarning("[LocationManager] WorldManager.Instance еще не готов или отсутствует на сцене!");
+        }
+
+        Debug.Log($"<color=cyan>[LOCATION]</color> Успешно загружена локация: <b>{activeLoc.locationName}</b>");
     }
 }
